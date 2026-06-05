@@ -893,6 +893,7 @@ export class GalleryController {
       element = document.createElement('img');
       element.alt = media.caption || '';
       element.className = 'modal-media is-loading';
+      element.setAttribute('referrerpolicy', 'no-referrer');
       
       element.onload = () => {
         element.classList.remove('is-loading');
