@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UnarVault</title>
+  <meta name="description" content="A premium, private memories vault for family photos, videos, events, and trips. Keeping moments safe and beautiful.">
+  <script type="module" crossorigin src="/assets/index-CJvZmzvz.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-uwmAGFEl.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="container header-container">
+      <a href="#home" class="logo">
+        <svg class="logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M18.5 5.5h.01"></path>
+        </svg>
+        UnarVault
+      </a>
+    </div>
+  </header>
+
+  <!-- HOME PAGE VIEW -->
+  <div id="home-view" class="page-view active">
+    <!-- Hero Top Slider -->
+    <section class="hero-section" id="hero-slider-section">
+      <div class="hero-slider-loader" id="hero-slider-loader">
+        <div class="spinner"></div>
+        <p style="color: rgba(255, 255, 255, 0.7); margin-top: 12px; font-size: 14px; font-weight: 500;">Loading memories...</p>
+      </div>
+      <div class="hero-slider" id="hero-slider-wrapper">
+        <!-- Slides will be generated dynamically by js/gallery.js -->
+      </div>
+      <div class="hero-overlay"></div>
+      
+      <!-- Manual controls -->
+      <button class="hero-control-btn hero-prev-btn" aria-label="Previous Slide">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <button class="hero-control-btn hero-next-btn" aria-label="Next Slide">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+
+      <div class="hero-content">
+        <h1 class="hero-title">UnarVault</h1>
+        <p class="hero-subtitle">Memories • Trips • Events • Moments</p>
+      </div>
+    </section>
+
+    <!-- Albums Grid -->
+    <section class="albums-section">
+      <div class="container">
+        <h2 class="section-title">
+          <svg class="section-title-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          Albums
+        </h2>
+        <div class="albums-grid">
+          <!-- Album Cards will be generated dynamically by js/gallery.js -->
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- GALLERY VIEW -->
+  <div id="gallery-view" class="page-view">
+    <section class="gallery-section">
+      <div class="container">
+        <div class="gallery-header">
+          <button class="back-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Back to Albums</span>
+          </button>
+          <div class="gallery-title-row">
+            <div class="gallery-title-info">
+              <h1 class="gallery-title">Album Name</h1>
+              <p class="gallery-desc">Album description goes here.</p>
+            </div>
+            <div class="gallery-action-buttons">
+              <button class="download-all-btn" id="download-all-btn" style="display: none;" title="Download all media in this album">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Download Album</span>
+              </button>
+              <a class="view-drive-btn" id="view-drive-btn" style="display: none;" target="_blank" rel="noopener noreferrer" title="View files directly on Google Drive">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>View on Drive</span>
+              </a>
+            </div>
+          </div>
+          <!-- Filter toggle chips -->
+          <div class="gallery-filters" id="gallery-filters-container">
+            <button class="filter-chip active" data-filter="all">All <span class="filter-count">(0)</span></button>
+            <button class="filter-chip" data-filter="images">Images <span class="filter-count">(0)</span></button>
+            <button class="filter-chip" data-filter="videos">Videos <span class="filter-count">(0)</span></button>
+          </div>
+        </div>
+
+        <!-- Loader element -->
+        <div class="gallery-loader" id="gallery-loader" style="display: none;">
+          <div class="spinner"></div>
+          <p>Fetching files from Google Drive...</p>
+        </div>
+        
+        <!-- Error banner element -->
+        <div class="gallery-error" id="gallery-error" style="display: none;">
+          <svg class="error-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <h3>Unable to load album</h3>
+          <p id="error-message-text">Please verify the Google Drive folder is shared publicly as "Anyone with the link can view".</p>
+        </div>
+
+        <!-- Masonry/Grid Media Items -->
+        <div class="media-grid">
+          <!-- Media elements (images/videos) will be rendered dynamically by js/gallery.js -->
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- FULLSCREEN LIGHTBOX MODAL VIEWER -->
+  <div id="modal-viewer" class="modal-viewer">
+    <!-- Lightbox Loader -->
+    <div class="lightbox-loader" id="lightbox-loader" style="display: none;">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="modal-content-wrapper">
+      <!-- Media placeholder (dynamically inserts img or video tags) -->
+      <div class="modal-media-container"></div>
+      
+      <!-- Custom Video Control Bar -->
+      <div class="custom-video-controls" id="custom-video-controls" style="display: none;">
+        <button class="control-btn play-pause-btn" aria-label="Play or Pause">
+          <svg class="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <svg class="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+          <svg class="replay-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+          </svg>
+        </button>
+
+        <button class="control-btn skip-back-btn" aria-label="Rewind 5 seconds">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0-.57-8.38l5.67-5.67"></path>
+          </svg>
+          <span style="font-size: 9px; font-weight: 700; margin-left: 2px;">-5s</span>
+        </button>
+
+        <button class="control-btn skip-fwd-btn" aria-label="Forward 5 seconds">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1 .57-8.38l-5.67-5.67"></path>
+          </svg>
+          <span style="font-size: 9px; font-weight: 700; margin-left: 2px;">+5s</span>
+        </button>
+
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill"></div>
+        </div>
+
+        <div class="volume-container">
+          <button class="control-btn volume-btn" aria-label="Mute or Unmute">
+            <svg class="volume-up-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <svg class="volume-mute-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <line x1="23" y1="9" x2="17" y2="15"></line>
+              <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+          </button>
+          <input type="range" class="volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume Slider"/>
+        </div>
+
+        <button class="control-btn fullscreen-btn" aria-label="Toggle Fullscreen">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Bottom Text Caption -->
+      <p class="modal-caption"></p>
+      
+      <!-- Interactive Buttons -->
+      <button class="modal-btn close-btn" aria-label="Close lightbox">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+
+      <button class="modal-btn download-btn" aria-label="Download current item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </button>
+      
+      <button class="modal-btn prev-btn" aria-label="Previous item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      
+      <button class="modal-btn next-btn" aria-label="Next item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- App Footer -->
+  <footer class="app-footer">
+    <div class="container footer-container">
+      <div class="footer-logo">
+        <svg class="footer-logo-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M18.5 5.5h.01"></path>
+        </svg>
+        UnarVault
+      </div>
+      <p>A private digital vault for our shared journeys, stories, and milestones.</p>
+      <p style="margin-top: 4px; font-size: 11px; opacity: 0.6;">&copy; 2026 UnarVault. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Third-party libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Main scripts -->
+</body>
+</html>
