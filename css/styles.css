@@ -1019,9 +1019,9 @@ iframe.modal-media {
   .modal-content-wrapper {
     display: flex;
     flex-direction: column;
-    width: 100%;
+    width: 95%;
     max-width: 550px;
-    height: auto;
+    height: 80% !important;
     max-height: calc(100dvh - 32px);
     background-color: #0b0b0b;
     border-radius: 16px;
@@ -1034,6 +1034,42 @@ iframe.modal-media {
     align-items: center;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
     gap: 0; /* No space between media and controls */
+  }
+
+  /* Fullscreen override specifically for videos to maximize media viewport and separate Google Drive controls */
+  .modal-content-wrapper:has(iframe),
+  .modal-content-wrapper:has(video) {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    padding: 72px 0 72px 0 !important; /* Zero padding on left/right to let video fill screen width */
+    background-color: #000000 !important; /* Pure black background for cinema video viewing */
+  }
+
+  /* Float navigation buttons on the left and right sides for videos to prevent overlapping the timing slider and playback controls */
+  .modal-content-wrapper:has(iframe) .prev-btn,
+  .modal-content-wrapper:has(video) .prev-btn {
+    position: absolute;
+    left: 16px !important;
+    right: auto !important;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%) !important;
+    z-index: 1010;
+  }
+
+  .modal-content-wrapper:has(iframe) .next-btn,
+  .modal-content-wrapper:has(video) .next-btn {
+    position: absolute;
+    right: 16px !important;
+    left: auto !important;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%) !important;
+    z-index: 1010;
   }
 
   .modal-media-container {
@@ -1054,6 +1090,12 @@ iframe.modal-media {
     width: auto;
     object-fit: contain;
     border-radius: var(--border-radius-sm);
+  }
+
+  iframe.modal-media {
+    width: 100% !important;
+    height: 100% !important;
+    border: none;
   }
 
   /* Force even tall images to fit inside the viewport */
@@ -1116,18 +1158,63 @@ iframe.modal-media {
     z-index: 1010;
   }
 
-  /* Custom Video controls placement: direct flow after media with no space */
+  /* Style custom video controls on mobile in a single responsive row */
   .custom-video-controls {
-    position: relative;
-    bottom: auto;
-    left: auto;
+    display: flex;
+    position: absolute;
+    bottom: 16px;
+    left: 12px;
+    right: 12px;
+    width: auto;
     transform: none;
-    width: 100%;
-    max-width: 100%;
-    margin-top: 0;
-    border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
-    z-index: 1005;
-    box-sizing: border-box;
+    max-width: calc(100% - 24px);
+    height: 42px;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--border-radius-md);
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    z-index: 1020;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  .custom-video-controls .control-btn {
+    width: auto;
+    min-width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 11px;
+  }
+
+  .custom-video-controls .control-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .custom-video-controls .skip-back-btn,
+  .custom-video-controls .skip-fwd-btn {
+    width: auto;
+    min-width: 38px;
+    padding: 0 4px;
+    gap: 2px;
+  }
+
+  .custom-video-controls .skip-back-btn span,
+  .custom-video-controls .skip-fwd-btn span {
+    font-size: 8px !important;
+  }
+
+  .custom-video-controls .volume-slider {
+    display: none !important;
+  }
+
+  .custom-video-controls .progress-bar-container {
+    height: 5px;
+    padding: 10px 0;
+    background-clip: content-box;
   }
 
   /* Bottom Control Row (Prev/Next buttons side-by-side centered below the image) */
