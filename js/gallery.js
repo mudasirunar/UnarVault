@@ -25,6 +25,26 @@ function getHighResUrl(url, size = 600) {
   return url;
 }
 
+/**
+ * Helper to fetch album media with retry logic and exponential backoff.
+ */
+async function fetchMediaWithRetry(album, retries = 4, delay = 1200) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const mediaList = await getMediaForAlbum(album);
+      if (mediaList && Array.isArray(mediaList)) {
+        return mediaList;
+      }
+    } catch (e) {
+      console.warn(`Fetch retry ${i + 1}/${retries} failed for album: ${album.name}`, e);
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+      }
+    }
+  }
+  throw new Error(`Failed to retrieve media for album ${album.name} after ${retries} attempts.`);
+}
+
 // SVG Icons
 const PLAY_ICON = `
   <svg viewBox="0 0 24 24">
@@ -54,7 +74,7 @@ export class HeroSlider {
   constructor(sliderSelector, intervalMs = 5000) {
     this.slider = document.querySelector(sliderSelector);
     if (!this.slider) return;
-    this.slides = this.slider.querySelectorAll('.slide');
+    this.wrapper = this.slider.querySelector('.hero-slider');
     this.intervalMs = intervalMs;
     this.currentIndex = 0;
     this.timer = null;
@@ -63,6 +83,11 @@ export class HeroSlider {
     this.nextBtn = this.slider.querySelector('.hero-next-btn');
     
     this.initEvents();
+  }
+
+  // Re-query slides fresh each time so dynamically loaded slides are included
+  getSlides() {
+    return this.wrapper ? this.wrapper.querySelectorAll('.slide') : [];
   }
 
   initEvents() {
@@ -75,8 +100,8 @@ export class HeroSlider {
   }
 
   start() {
-    if (this.slides.length <= 1) return;
     this.stop();
+    if (this.getSlides().length <= 1) return;
     this.timer = setInterval(() => this.nextSlide(), this.intervalMs);
   }
 
@@ -88,17 +113,22 @@ export class HeroSlider {
   }
 
   nextSlide() {
-    if (this.slides.length <= 1) return;
-    this.slides[this.currentIndex].classList.remove('active');
-    this.currentIndex = (this.currentIndex + 1) % this.slides.length;
-    this.slides[this.currentIndex].classList.add('active');
+    const slides = this.getSlides();
+    if (slides.length <= 1) return;
+    // Clamp currentIndex in case slides changed
+    if (this.currentIndex >= slides.length) this.currentIndex = 0;
+    slides[this.currentIndex].classList.remove('active');
+    this.currentIndex = (this.currentIndex + 1) % slides.length;
+    slides[this.currentIndex].classList.add('active');
   }
 
   prevSlide() {
-    if (this.slides.length <= 1) return;
-    this.slides[this.currentIndex].classList.remove('active');
-    this.currentIndex = (this.currentIndex - 1 + this.slides.length) % this.slides.length;
-    this.slides[this.currentIndex].classList.add('active');
+    const slides = this.getSlides();
+    if (slides.length <= 1) return;
+    if (this.currentIndex >= slides.length) this.currentIndex = 0;
+    slides[this.currentIndex].classList.remove('active');
+    this.currentIndex = (this.currentIndex - 1 + slides.length) % slides.length;
+    slides[this.currentIndex].classList.add('active');
   }
 
   nextSlideManual() {
@@ -127,6 +157,7 @@ export class GalleryController {
     this.galleryTitle = document.querySelector('.gallery-title');
     this.galleryDesc = document.querySelector('.gallery-desc');
     this.backBtn = document.querySelector('.back-btn');
+    this.logoLink = document.querySelector('.logo');
     
     // Gallery Filters
     this.galleryFiltersContainer = document.getElementById('gallery-filters-container');
@@ -146,6 +177,8 @@ export class GalleryController {
     this.prevBtn = document.querySelector('.prev-btn');
     this.nextBtn = document.querySelector('.next-btn');
     this.downloadBtn = this.modal.querySelector('.download-btn');
+    this.downloadAllBtn = document.getElementById('download-all-btn');
+    this.viewDriveBtn = document.getElementById('view-drive-btn');
     this.lightboxLoader = document.getElementById('lightbox-loader');
     
     // Custom Video Control Elements
@@ -183,6 +216,16 @@ export class GalleryController {
     if (this.backBtn) {
       this.backBtn.addEventListener('click', () => this.showHomeView());
     }
+
+    // Logo Click (scroll to top on home screen)
+    if (this.logoLink) {
+      this.logoLink.addEventListener('click', (e) => {
+        if (!this.activeAlbumId) {
+          e.preventDefault();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+    }
     
     // Filter chip triggers
     if (this.galleryFiltersContainer) {
@@ -211,6 +254,11 @@ export class GalleryController {
     // Download current item click listener
     if (this.downloadBtn) {
       this.downloadBtn.addEventListener('click', () => this.downloadActiveMedia());
+    }
+
+    // Download all album media click listener
+    if (this.downloadAllBtn) {
+      this.downloadAllBtn.addEventListener('click', () => this.downloadAllMedia());
     }
 
     // Custom Video Players Click Listeners
@@ -334,7 +382,7 @@ export class GalleryController {
       (async () => {
         let media = [];
         try {
-          media = await getMediaForAlbum(album);
+          media = await fetchMediaWithRetry(album, 4, 1200);
         } catch (e) {
           console.error("Failed to dynamically fetch album media:", e);
         }
@@ -344,24 +392,18 @@ export class GalleryController {
           thumbnail = media[0].thumbnail || media[0].url;
         }
         
-        // Optimize resolution for grid card preview
-        thumbnail = getHighResUrl(thumbnail, 600);
-        
-        // Final fallback if loading or api fails
-        if (!thumbnail) {
-          thumbnail = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=600&auto=format&fit=crop";
+        if (thumbnail) {
+          // Optimize resolution for grid card preview
+          thumbnail = getHighResUrl(thumbnail, 600);
+          img.src = thumbnail;
+          img.onload = () => {
+            img.style.opacity = '1';
+            if (spinner) spinner.remove();
+          };
+          img.onerror = () => {
+            console.error("Cover image failed to load:", thumbnail);
+          };
         }
-        
-        img.src = thumbnail;
-        img.onload = () => {
-          img.style.opacity = '1';
-          if (spinner) spinner.remove();
-        };
-        img.onerror = () => {
-          img.src = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=600&auto=format&fit=crop";
-          img.style.opacity = '1';
-          if (spinner) spinner.remove();
-        };
       })();
     });
   }
@@ -404,10 +446,10 @@ export class GalleryController {
     
     const albumsImages = await Promise.all(allMediaPromises);
     
-    // Pick a random 20% subset of images from each folder (minimum 1 if folder has images)
+    // Pick a random 45% subset of images from each folder (minimum 1 if folder has images)
     const selectedImagesPerAlbum = albumsImages.map(images => {
       if (images.length === 0) return [];
-      const countToPick = Math.max(1, Math.round(images.length * 0.2));
+      const countToPick = Math.max(1, Math.min(10, Math.round(images.length * 0.45)));
       const shuffled = [...images].sort(() => 0.5 - Math.random());
       return shuffled.slice(0, countToPick);
     });
@@ -430,39 +472,67 @@ export class GalleryController {
       return;
     }
     
-    // Render dynamic slides
+    // Pre-load all images — only successfully loaded ones become slides
     sliderWrapper.innerHTML = '';
-    slidesList.forEach((media, idx) => {
-      const slide = document.createElement('div');
-      slide.className = `slide ${idx === 0 ? 'active' : ''}`;
-      // Use public CDN url for slides background
-      const slideUrl = getHighResUrl(media.url, 1600);
-      slide.style.backgroundImage = `url('${slideUrl}')`;
-      sliderWrapper.appendChild(slide);
-    });
+    const loadedSlides = [];
+    let sliderStarted = false;
     
-    // Preload first slide image for smooth loader fadeout
-    if (slidesList.length > 0) {
-      const firstImgUrl = getHighResUrl(slidesList[0].url, 1600);
-      const img = new Image();
-      img.src = firstImgUrl;
-      const hideLoader = () => {
-        if (sliderLoader) {
-          sliderLoader.style.opacity = '0';
-          setTimeout(() => {
-            sliderLoader.style.display = 'none';
-          }, 500);
+    const dismissLoader = () => {
+      if (sliderLoader) {
+        sliderLoader.style.opacity = '0';
+        setTimeout(() => { sliderLoader.style.display = 'none'; }, 300);
+      }
+    };
+    
+    const startSlider = () => {
+      if (sliderStarted) return;
+      if (loadedSlides.length === 0) return;
+      sliderStarted = true;
+      
+      // Mark the first loaded slide as active
+      loadedSlides[0].classList.add('active');
+      
+      dismissLoader();
+      
+      // Initialize slider and start
+      this.heroSlider = new HeroSlider('#hero-slider-section', 5000);
+      this.heroSlider.start();
+    };
+    
+    // Safety timeout — force-start with whatever we have after 5 seconds
+    const safetyTimer = setTimeout(() => {
+      if (!sliderStarted) {
+        if (loadedSlides.length > 0) {
+          startSlider();
+        } else {
+          // Nothing loaded at all — hide section
+          sliderSection.style.display = 'none';
+          dismissLoader();
         }
-      };
-      img.onload = hideLoader;
-      img.onerror = hideLoader;
-    } else {
-      if (sliderLoader) sliderLoader.style.display = 'none';
-    }
+      }
+    }, 5000);
     
-    // Initialize slider control class
-    this.heroSlider = new HeroSlider('#hero-slider-section', 5000);
-    this.heroSlider.start();
+    slidesList.forEach((media) => {
+      const slideUrl = getHighResUrl(media.url, 1200);
+      const img = new Image();
+      img.src = slideUrl;
+      
+      img.onload = () => {
+        const slide = document.createElement('div');
+        slide.className = 'slide';
+        slide.style.backgroundImage = `url('${slideUrl}')`;
+        sliderWrapper.appendChild(slide);
+        loadedSlides.push(slide);
+        
+        // Start as soon as the first image is ready
+        startSlider();
+      };
+      
+      // On error — simply skip this image, don't add a blank slide
+      img.onerror = () => {
+        console.warn("Hero slide image failed to load, skipping:", slideUrl);
+      };
+    });
   }
 
   /**
@@ -487,6 +557,8 @@ export class GalleryController {
     
     // Disable filters initially while loading
     this.setFiltersDisabled(true);
+    if (this.downloadAllBtn) this.downloadAllBtn.style.display = 'none';
+    if (this.viewDriveBtn) this.viewDriveBtn.style.display = 'none';
     
     // Pause hero slider if running to save resources
     if (this.heroSlider) {
@@ -541,6 +613,17 @@ export class GalleryController {
       // Hide loader, show grid
       if (loader) loader.style.display = 'none';
       if (this.mediaGrid) this.mediaGrid.style.display = 'block';
+      if (this.downloadAllBtn && this.activeMediaList.length > 0) {
+        this.downloadAllBtn.style.display = 'inline-flex';
+      }
+      if (this.viewDriveBtn) {
+        if (album.source && album.source !== "local" && !album.source.startsWith("http")) {
+          this.viewDriveBtn.href = `https://drive.google.com/drive/folders/${album.source}`;
+          this.viewDriveBtn.style.display = 'inline-flex';
+        } else {
+          this.viewDriveBtn.style.display = 'none';
+        }
+      }
     } catch (error) {
       console.error("Failed to load gallery files:", error);
       
@@ -569,6 +652,12 @@ export class GalleryController {
       this.heroSlider.start();
     }
     
+    if (this.downloadAllBtn) {
+      this.downloadAllBtn.style.display = 'none';
+    }
+    if (this.viewDriveBtn) {
+      this.viewDriveBtn.style.display = 'none';
+    }
     this.galleryView.classList.remove('active');
     this.homeView.classList.add('active');
     
@@ -647,17 +736,25 @@ export class GalleryController {
       
       let thumbnailElement = '';
       if (isVideo) {
-        // Optimize video cover preview image size to w600
-        const mockThumbnail = getHighResUrl(media.thumbnail || "https://images.unsplash.com/photo-1518173946687-a4c8a383392e?q=80&w=600&auto=format&fit=crop", 600);
-        thumbnailElement = `
-          <div class="spinner-mini"></div>
-          <img src="${mockThumbnail}" alt="${media.caption}" class="media-element is-loading" style="opacity: 0; transition: opacity 0.4s ease, filter 0.4s ease;" loading="lazy" />
-          <div class="video-indicator">
-            ${PLAY_ICON}
-          </div>
-        `;
+        if (media.thumbnail) {
+          const mockThumbnail = getHighResUrl(media.thumbnail, 600);
+          thumbnailElement = `
+            <div class="spinner-mini"></div>
+            <img src="${mockThumbnail}" alt="${media.caption}" class="media-element is-loading" style="opacity: 0; transition: opacity 0.4s ease, filter 0.4s ease;" loading="lazy" />
+            <div class="video-indicator">
+              ${PLAY_ICON}
+            </div>
+          `;
+        } else {
+          thumbnailElement = `
+            <div class="media-placeholder-card">
+              <div class="video-indicator" style="display: flex; opacity: 1; transform: translate(-50%, -50%);">
+                ${PLAY_ICON}
+              </div>
+            </div>
+          `;
+        }
       } else {
-        // Optimize grid image size to w600
         const gridImgUrl = getHighResUrl(media.url, 600);
         thumbnailElement = `
           <div class="spinner-mini"></div>
@@ -681,9 +778,9 @@ export class GalleryController {
           if (spinner) spinner.remove();
         };
         img.onerror = () => {
+          console.error("Failed to load gallery image thumbnail:", img.src);
           img.classList.remove('is-loading');
-          img.src = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=600&auto=format&fit=crop";
-          img.style.opacity = '1';
+          img.style.display = 'none'; // Hide broken image element
           if (spinner) spinner.remove();
         };
       }
@@ -963,5 +1060,163 @@ export class GalleryController {
       
       window.open(downloadUrl, '_blank');
     }
+  }
+
+  async downloadAllMedia() {
+    if (!this.activeMediaList || this.activeMediaList.length === 0) return;
+    
+    const originalContent = this.downloadAllBtn.innerHTML;
+    this.downloadAllBtn.classList.add('loading');
+    this.downloadAllBtn.disabled = true;
+    
+    const albumName = this.galleryTitle.textContent || 'Album';
+    const total = this.activeMediaList.length;
+    
+    // Check if browser supports sharing files natively (common on iOS/Android)
+    let canShare = false;
+    try {
+      const testFile = new File([new Blob([''], { type: 'image/jpeg' })], 'test.jpg', { type: 'image/jpeg' });
+      canShare = navigator.canShare && navigator.canShare({ files: [testFile] });
+    } catch (e) {
+      canShare = false;
+    }
+    
+    const limit = 3;
+    let completed = 0;
+    const filesArray = [];
+    const failedUrls = [];
+    const zip = canShare ? null : new JSZip();
+    
+    const updateProgress = () => {
+      this.downloadAllBtn.innerHTML = `
+        <div class="download-spinner" style="margin-right: 8px;"></div>
+        <span>Downloading (${completed}/${total})...</span>
+      `;
+    };
+    
+    updateProgress();
+    
+    const downloadItem = async (media, index) => {
+      const extension = media.type === 'video' ? 'mp4' : 'jpg';
+      const mimeType = media.type === 'video' ? 'video/mp4' : 'image/jpeg';
+      const safeCaption = media.caption ? media.caption.replace(/[\s\W]+/g, '_') : '';
+      const filename = `${safeCaption || `media_${index + 1}`}.${extension}`;
+      
+      try {
+        const response = await fetch(media.url);
+        if (!response.ok) throw new Error("CORS or network error");
+        const blob = await response.blob();
+        
+        if (canShare) {
+          const file = new File([blob], filename, { type: mimeType });
+          filesArray.push(file);
+        } else {
+          zip.file(filename, blob);
+        }
+      } catch (err) {
+        console.warn(`Could not fetch media client-side: ${media.url}`, err);
+        let fallbackUrl = media.url;
+        if (media.url.includes('lh3.googleusercontent.com/d/')) {
+          const fileId = media.url.split('lh3.googleusercontent.com/d/')[1].split(/[?&]/)[0];
+          fallbackUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+        }
+        failedUrls.push({ name: filename, url: fallbackUrl });
+      }
+      
+      completed++;
+      updateProgress();
+    };
+    
+    // Process in parallel chunks of 3
+    const chunks = [];
+    for (let i = 0; i < total; i += limit) {
+      chunks.push(this.activeMediaList.slice(i, i + limit));
+    }
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      await Promise.all(chunk.map((media, chunkIdx) => {
+        const originalIdx = i * limit + chunkIdx;
+        return downloadItem(media, originalIdx);
+      }));
+    }
+    
+    if (canShare && filesArray.length > 0) {
+      this.downloadAllBtn.innerHTML = `
+        <div class="download-spinner" style="margin-right: 8px;"></div>
+        <span>Opening Share Sheet...</span>
+      `;
+      try {
+        await navigator.share({
+          files: filesArray,
+          title: albumName,
+          text: `Download files from ${albumName}`
+        });
+      } catch (shareErr) {
+        // If they didn't abort/cancel manually, fallback to ZIP download
+        if (shareErr.name !== 'AbortError') {
+          console.error("Web Share failed, falling back to ZIP download:", shareErr);
+          // Load files into a new ZIP and download
+          const fallbackZip = new JSZip();
+          for (let i = 0; i < filesArray.length; i++) {
+            fallbackZip.file(filesArray[i].name, filesArray[i]);
+          }
+          await this.generateAndDownloadZip(fallbackZip, albumName, failedUrls, originalContent);
+          return;
+        }
+      }
+    } else if (!canShare) {
+      await this.generateAndDownloadZip(zip, albumName, failedUrls, originalContent);
+      return;
+    }
+    
+    // Restore button state
+    this.downloadAllBtn.innerHTML = originalContent;
+    this.downloadAllBtn.classList.remove('loading');
+    this.downloadAllBtn.disabled = false;
+    
+    const succeededCount = filesArray.length;
+    if (failedUrls.length > 0) {
+      alert(`Download complete! ${succeededCount} items ready. ${failedUrls.length} items couldn't be retrieved due to browser security restrictions.`);
+    }
+  }
+
+  async generateAndDownloadZip(zip, albumName, failedUrls, originalContent) {
+    if (!zip) zip = new JSZip();
+    
+    if (failedUrls.length > 0) {
+      let fileContent = "The following files could not be packaged directly into the zip archive because of browser security (CORS) or Google Drive access rules.\n";
+      fileContent += "You can copy and paste the links below into your web browser to download them individually:\n\n";
+      failedUrls.forEach(item => {
+        fileContent += `${item.name}: ${item.url}\n\n`;
+      });
+      zip.file("FAILED_DOWNLOADS_LINKS.txt", fileContent);
+    }
+    
+    this.downloadAllBtn.innerHTML = `
+      <div class="download-spinner" style="margin-right: 8px;"></div>
+      <span>Generating ZIP...</span>
+    `;
+    
+    try {
+      const content = await zip.generateAsync({ type: "blob" });
+      const zipFilename = `${albumName.replace(/[\s\W]+/g, '_') || 'Album_Media'}.zip`;
+      
+      const blobUrl = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = zipFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (zipErr) {
+      console.error("Zipping failed:", zipErr);
+      alert("An error occurred while zipping files.");
+    }
+    
+    this.downloadAllBtn.innerHTML = originalContent;
+    this.downloadAllBtn.classList.remove('loading');
+    this.downloadAllBtn.disabled = false;
   }
 }

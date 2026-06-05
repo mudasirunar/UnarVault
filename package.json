@@ -4,7 +4,7 @@
   "description": "Private family memories, trips, and moments gallery vault",
   "main": "index.html",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview"
   },

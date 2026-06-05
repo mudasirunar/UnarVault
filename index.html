@@ -87,6 +87,24 @@
               <h1 class="gallery-title">Album Name</h1>
               <p class="gallery-desc">Album description goes here.</p>
             </div>
+            <div class="gallery-action-buttons">
+              <button class="download-all-btn" id="download-all-btn" style="display: none;" title="Download all media in this album">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Download Album</span>
+              </button>
+              <a class="view-drive-btn" id="view-drive-btn" style="display: none;" target="_blank" rel="noopener noreferrer" title="View files directly on Google Drive">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>View on Drive</span>
+              </a>
+            </div>
           </div>
           <!-- Filter toggle chips -->
           <div class="gallery-filters" id="gallery-filters-container">
@@ -236,6 +254,8 @@
     </div>
   </footer>
 
+  <!-- Third-party libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <!-- Main scripts -->
   <script src="js/app.js" type="module"></script>
 </body>
