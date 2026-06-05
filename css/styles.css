@@ -822,11 +822,40 @@ button {
   align-items: center;
   opacity: 0;
   transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  overscroll-behavior: contain; /* Prevents scroll chaining / background scroll */
+}
+
+/* Prevent background scrolling when lightbox is active */
+html.lightbox-open,
+body.lightbox-open {
+  overflow: hidden !important;
+  height: 100% !important;
 }
 
 .modal-viewer.active {
   display: flex;
   opacity: 1;
+}
+
+/* Hide navigation and control buttons with a smooth fade when media is loading */
+.modal-viewer.lightbox-loading .close-btn,
+.modal-viewer.lightbox-loading .download-btn,
+.modal-viewer.lightbox-loading .prev-btn,
+.modal-viewer.lightbox-loading .next-btn,
+.modal-viewer.lightbox-loading .modal-caption,
+.modal-viewer.lightbox-loading .custom-video-controls {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Smooth transition for control elements when fading in and out */
+.modal-viewer .close-btn,
+.modal-viewer .download-btn,
+.modal-viewer .prev-btn,
+.modal-viewer .next-btn,
+.modal-viewer .modal-caption,
+.modal-viewer .custom-video-controls {
+  transition: opacity 0.25s ease-in-out, transform var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast) !important;
 }
 
 .modal-content-wrapper {
@@ -904,9 +933,11 @@ iframe.modal-media {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-.modal-btn:hover {
-  color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.15);
+@media (hover: hover) {
+  .modal-btn:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.15);
+  }
 }
 
 .close-btn {
@@ -925,8 +956,10 @@ iframe.modal-media {
   transform: translateY(-50%);
 }
 
-.prev-btn:hover {
-  transform: translateY(-50%) translateX(-4px);
+@media (hover: hover) {
+  .prev-btn:hover {
+    transform: translateY(-50%) translateX(-4px);
+  }
 }
 
 .next-btn {
@@ -935,12 +968,18 @@ iframe.modal-media {
   transform: translateY(-50%);
 }
 
-.next-btn:hover {
-  transform: translateY(-50%) translateX(4px);
+@media (hover: hover) {
+  .next-btn:hover {
+    transform: translateY(-50%) translateX(4px);
+  }
 }
 
-/* Responsive modal buttons for smaller screens */
+/* Responsive modal buttons and layout for smaller screens */
 @media (max-width: 1120px) {
+  .modal-content-wrapper {
+    width: 80%; /* Leave 10% margins on sides for next/prev buttons on tablet */
+  }
+  
   .prev-btn {
     left: 10px;
     background-color: rgba(0, 0, 0, 0.5);
@@ -961,6 +1000,166 @@ iframe.modal-media {
     top: 10px;
     right: 70px;
     background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1010;
+  }
+}
+
+/* Mobile-optimized Lightbox UI Grid (768px and below) */
+@media (max-width: 768px) {
+  .modal-viewer.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* Prevent parent viewer from scrolling on mobile */
+    padding: 16px;
+    box-sizing: border-box;
+    height: 100dvh !important;
+  }
+
+  .modal-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 550px;
+    height: auto;
+    max-height: calc(100dvh - 32px);
+    background-color: #0b0b0b;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 72px 16px 72px 16px; /* Symmetrical padding to guarantee perfect centering */
+    box-sizing: border-box;
+    position: relative;
+    margin: 0 !important;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
+    gap: 0; /* No space between media and controls */
+  }
+
+  .modal-media-container {
+    width: 100%;
+    height: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* Fit only, no scrolling */
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .modal-media {
+    max-width: 100%;
+    max-height: 100%; /* Fit exactly inside the container */
+    height: auto;
+    width: auto;
+    object-fit: contain;
+    border-radius: var(--border-radius-sm);
+  }
+
+  /* Force even tall images to fit inside the viewport */
+  .modal-media.very-tall {
+    max-height: 100%;
+    width: auto;
+  }
+
+  /* Top Control Buttons: close and download side-by-side in right corner */
+  .close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    left: auto;
+    bottom: auto;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 1010;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0;
+    transform: none !important;
+  }
+
+  .download-btn {
+    position: absolute;
+    top: 16px;
+    right: 64px; /* Positioned next to close button */
+    left: auto;
+    bottom: auto;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 1010;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0;
+    transform: none !important;
+  }
+
+  /* Caption (Image Name): placed in top row to the left of the Download button */
+  .modal-caption {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 112px; /* Leave space so it never overlaps buttons */
+    height: 40px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Truncate if name is too long */
+    z-index: 1010;
+  }
+
+  /* Custom Video controls placement: direct flow after media with no space */
+  .custom-video-controls {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 0;
+    border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+    z-index: 1005;
+    box-sizing: border-box;
+  }
+
+  /* Bottom Control Row (Prev/Next buttons side-by-side centered below the image) */
+  .prev-btn {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    right: auto;
+    top: auto;
+    transform: translateX(-50%) translateX(-24px) !important;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0;
+    z-index: 1010;
+  }
+
+  .next-btn {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    right: auto;
+    top: auto;
+    transform: translateX(-50%) translateX(24px) !important;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin: 0;
     z-index: 1010;
   }
 }
@@ -1159,9 +1358,11 @@ iframe.modal-media {
   transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
-.control-btn:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+@media (hover: hover) {
+  .control-btn:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+  }
 }
 
 .control-btn:active {

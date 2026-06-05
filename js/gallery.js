@@ -838,6 +838,8 @@ export class GalleryController {
     this.updateLightboxContent();
     this.modal.classList.add('active');
     document.body.style.overflow = 'hidden'; // Stop background scrolling
+    document.body.classList.add('lightbox-open');
+    document.documentElement.classList.add('lightbox-open');
   }
 
   closeLightbox() {
@@ -847,7 +849,10 @@ export class GalleryController {
     }
     this.modalMediaContainer.innerHTML = '';
     this.modal.classList.remove('active');
+    this.modal.classList.remove('lightbox-loading');
     document.body.style.overflow = ''; // Restore background scrolling
+    document.body.classList.remove('lightbox-open');
+    document.documentElement.classList.remove('lightbox-open');
     if (this.videoControls) this.videoControls.style.display = 'none';
   }
 
@@ -862,6 +867,7 @@ export class GalleryController {
 
   updateLightboxContent() {
     this.modalMediaContainer.innerHTML = ''; // Reset container
+    this.modalMediaContainer.scrollTop = 0;   // Reset scroll position to top
     
     // Hide controls initially
     if (this.videoControls) this.videoControls.style.display = 'none';
@@ -870,7 +876,8 @@ export class GalleryController {
     const media = this.filteredMediaList[this.currentMediaIndex];
     if (!media) return;
     
-    // Show Lightbox Loader
+    // Show Lightbox Loader and tag modal as loading to hide controls
+    this.modal.classList.add('lightbox-loading');
     if (this.lightboxLoader) this.lightboxLoader.style.display = 'flex';
 
     let element;
@@ -901,6 +908,7 @@ export class GalleryController {
       
       element.onload = () => {
         if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
+        this.modal.classList.remove('lightbox-loading');
       };
       
       this.modalMediaContainer.appendChild(element);
@@ -914,9 +922,19 @@ export class GalleryController {
       element.onload = () => {
         element.classList.remove('is-loading');
         if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
+        this.modal.classList.remove('lightbox-loading');
+        
+        // Tag very tall images to allow vertical scrolling on mobile
+        if (element.naturalWidth && element.naturalHeight) {
+          const aspectRatio = element.naturalHeight / element.naturalWidth;
+          if (aspectRatio > 1.5) {
+            element.classList.add('very-tall');
+          }
+        }
       };
       element.onerror = () => {
         if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
+        this.modal.classList.remove('lightbox-loading');
         
         // Render detailed warning panel and Reload Button
         this.modalMediaContainer.innerHTML = `
