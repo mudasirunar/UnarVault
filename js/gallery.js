@@ -782,6 +782,31 @@ export class GalleryController {
           img.classList.remove('is-loading');
           img.style.display = 'none'; // Hide broken image element
           if (spinner) spinner.remove();
+          
+          // Inject a placeholder so the grid item doesn't collapse to 0 height
+          if (isVideo) {
+            item.innerHTML = `
+              <div class="media-placeholder-card">
+                <div class="video-indicator" style="display: flex; opacity: 1; transform: translate(-50%, -50%);">
+                  ${PLAY_ICON}
+                </div>
+              </div>
+              <div class="media-overlay">
+                <div class="media-caption">${media.caption}</div>
+              </div>
+            `;
+          } else {
+            item.innerHTML = `
+              <div class="media-placeholder-card" style="aspect-ratio: 1/1;">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-secondary);">
+                  ${PHOTO_ICON}
+                </div>
+              </div>
+              <div class="media-overlay">
+                <div class="media-caption">${media.caption}</div>
+              </div>
+            `;
+          }
         };
       }
       

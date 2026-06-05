@@ -3,31 +3,19 @@
  * Handles fetching, parsing, and query helpers for the albums database.
  */
 
+import albumsData from '../data/albums.json';
+
 // Google Apps Script Web App Deployment URL
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzue4gbVwspqTWelN7qiwclr3RwpMtj85FhKYLEFvAbo0K5wxZlJqsOo_1E3t86Fky1/exec';
 
-let cachedAlbums = null;
+let cachedAlbums = albumsData;
 
 /**
  * Loads albums and media metadata from the centralized albums.json.
  * @returns {Promise<Array>} List of albums
  */
 export async function loadAlbums() {
-  if (cachedAlbums) {
-    return cachedAlbums;
-  }
-  
-  try {
-    const response = await fetch('./data/albums.json');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch albums.json: ${response.statusText}`);
-    }
-    cachedAlbums = await response.json();
-    return cachedAlbums;
-  } catch (error) {
-    console.error("Error loading albums database:", error);
-    return [];
-  }
+  return cachedAlbums;
 }
 
 /**
