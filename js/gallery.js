@@ -449,8 +449,15 @@ export class GalleryController {
     // Pick a random 45% subset of images from each folder (minimum 1 if folder has images)
     const selectedImagesPerAlbum = albumsImages.map(images => {
       if (images.length === 0) return [];
-      const countToPick = Math.max(1, Math.min(10, Math.round(images.length * 0.45)));
-      const shuffled = [...images].sort(() => 0.5 - Math.random());
+      const countToPick = Math.max(1, Math.min(20, Math.round(images.length * 0.45)));
+      
+      // Proper Fisher-Yates shuffle for true randomness
+      const shuffled = [...images];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      
       return shuffled.slice(0, countToPick);
     });
     
