@@ -208,6 +208,11 @@ export class GalleryController {
     this.currentVolume = 1; // session volume persistence
     this.heroSlider = null;
     
+    // Download State Tracking
+    this.downloadAbortController = null;
+    this.isDownloadingAll = false;
+    this.originalDownloadBtnHtml = '';
+    
     this.initEvents();
   }
 
@@ -642,6 +647,17 @@ export class GalleryController {
   }
 
   showHomeView() {
+    // If a bulk download is currently running, cancel it
+    if (this.isDownloadingAll && this.downloadAbortController) {
+      this.downloadAbortController.abort();
+      this.isDownloadingAll = false;
+      if (this.downloadAllBtn) {
+        this.downloadAllBtn.innerHTML = this.originalDownloadBtnHtml || 'Download All';
+        this.downloadAllBtn.classList.remove('loading');
+        this.downloadAllBtn.disabled = false;
+      }
+    }
+
     this.activeAlbumId = null;
     this.activeMediaList = [];
     this.filteredMediaList = [];
@@ -1071,8 +1087,12 @@ export class GalleryController {
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      
+      // Delay removal to allow mobile browsers (like iOS Safari / Android Chrome) to start processing download thread
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 500);
     } catch (error) {
       console.warn("Direct fetch blocked (CORS). Falling back to Google Drive forced download trigger:", error);
       
@@ -1083,62 +1103,61 @@ export class GalleryController {
         downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
       }
       
-      window.open(downloadUrl, '_blank');
+      // Use window.location.href to avoid mobile browser popup blockers blocking async window.open
+      window.location.href = downloadUrl;
     }
   }
 
   async downloadAllMedia() {
     if (!this.activeMediaList || this.activeMediaList.length === 0) return;
     
+    // Set up cancellation state
+    this.isDownloadingAll = true;
+    this.downloadAbortController = new AbortController();
+    const { signal } = this.downloadAbortController;
+    
     const originalContent = this.downloadAllBtn.innerHTML;
+    this.originalDownloadBtnHtml = originalContent; // Save for cancellation recovery
     this.downloadAllBtn.classList.add('loading');
     this.downloadAllBtn.disabled = true;
     
     const albumName = this.galleryTitle.textContent || 'Album';
     const total = this.activeMediaList.length;
     
-    // Check if browser supports sharing files natively (common on iOS/Android)
-    let canShare = false;
-    try {
-      const testFile = new File([new Blob([''], { type: 'image/jpeg' })], 'test.jpg', { type: 'image/jpeg' });
-      canShare = navigator.canShare && navigator.canShare({ files: [testFile] });
-    } catch (e) {
-      canShare = false;
-    }
-    
     const limit = 3;
     let completed = 0;
-    const filesArray = [];
     const failedUrls = [];
-    const zip = canShare ? null : new JSZip();
+    const zip = new JSZip();
     
     const updateProgress = () => {
+      // Don't update UI if cancelled
+      if (!this.isDownloadingAll) return; 
+      
       this.downloadAllBtn.innerHTML = `
         <div class="download-spinner" style="margin-right: 8px;"></div>
-        <span>Downloading (${completed}/${total})...</span>
+        <span>Zipping (${completed}/${total})...</span>
       `;
     };
     
     updateProgress();
     
     const downloadItem = async (media, index) => {
+      if (!this.isDownloadingAll) return; // Exit early if cancelled
+      
       const extension = media.type === 'video' ? 'mp4' : 'jpg';
-      const mimeType = media.type === 'video' ? 'video/mp4' : 'image/jpeg';
       const safeCaption = media.caption ? media.caption.replace(/[\s\W]+/g, '_') : '';
       const filename = `${safeCaption || `media_${index + 1}`}.${extension}`;
       
       try {
-        const response = await fetch(media.url);
+        const response = await fetch(media.url, { signal });
         if (!response.ok) throw new Error("CORS or network error");
         const blob = await response.blob();
-        
-        if (canShare) {
-          const file = new File([blob], filename, { type: mimeType });
-          filesArray.push(file);
-        } else {
-          zip.file(filename, blob);
-        }
+        zip.file(filename, blob);
       } catch (err) {
+        if (err.name === 'AbortError') {
+           // Silently ignore aborts
+           return;
+        }
         console.warn(`Could not fetch media client-side: ${media.url}`, err);
         let fallbackUrl = media.url;
         if (media.url.includes('lh3.googleusercontent.com/d/')) {
@@ -1148,17 +1167,21 @@ export class GalleryController {
         failedUrls.push({ name: filename, url: fallbackUrl });
       }
       
-      completed++;
-      updateProgress();
+      if (this.isDownloadingAll) {
+        completed++;
+        updateProgress();
+      }
     };
     
-    // Process in parallel chunks of 3
+    // Process in parallel chunks of 3 to avoid overwhelming the network
     const chunks = [];
     for (let i = 0; i < total; i += limit) {
       chunks.push(this.activeMediaList.slice(i, i + limit));
     }
     
     for (let i = 0; i < chunks.length; i++) {
+      if (!this.isDownloadingAll) break; // Stop processing chunks if cancelled
+      
       const chunk = chunks[i];
       await Promise.all(chunk.map((media, chunkIdx) => {
         const originalIdx = i * limit + chunkIdx;
@@ -1166,44 +1189,14 @@ export class GalleryController {
       }));
     }
     
-    if (canShare && filesArray.length > 0) {
-      this.downloadAllBtn.innerHTML = `
-        <div class="download-spinner" style="margin-right: 8px;"></div>
-        <span>Opening Share Sheet...</span>
-      `;
-      try {
-        await navigator.share({
-          files: filesArray,
-          title: albumName,
-          text: `Download files from ${albumName}`
-        });
-      } catch (shareErr) {
-        // If they didn't abort/cancel manually, fallback to ZIP download
-        if (shareErr.name !== 'AbortError') {
-          console.error("Web Share failed, falling back to ZIP download:", shareErr);
-          // Load files into a new ZIP and download
-          const fallbackZip = new JSZip();
-          for (let i = 0; i < filesArray.length; i++) {
-            fallbackZip.file(filesArray[i].name, filesArray[i]);
-          }
-          await this.generateAndDownloadZip(fallbackZip, albumName, failedUrls, originalContent);
-          return;
-        }
-      }
-    } else if (!canShare) {
-      await this.generateAndDownloadZip(zip, albumName, failedUrls, originalContent);
-      return;
-    }
+    // If download was cancelled during the loops, exit cleanly
+    if (!this.isDownloadingAll) return;
     
-    // Restore button state
-    this.downloadAllBtn.innerHTML = originalContent;
-    this.downloadAllBtn.classList.remove('loading');
-    this.downloadAllBtn.disabled = false;
+    // Clean up abort controller since we finished downloading
+    this.downloadAbortController = null;
+    this.isDownloadingAll = false;
     
-    const succeededCount = filesArray.length;
-    if (failedUrls.length > 0) {
-      alert(`Download complete! ${succeededCount} items ready. ${failedUrls.length} items couldn't be retrieved due to browser security restrictions.`);
-    }
+    await this.generateAndDownloadZip(zip, albumName, failedUrls, originalContent);
   }
 
   async generateAndDownloadZip(zip, albumName, failedUrls, originalContent) {
@@ -1233,8 +1226,12 @@ export class GalleryController {
       a.download = zipFilename;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      
+      // Delay removal to allow mobile browsers (like iOS Safari / Android Chrome) to start processing download thread
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 500);
     } catch (zipErr) {
       console.error("Zipping failed:", zipErr);
       alert("An error occurred while zipping files.");
@@ -1243,5 +1240,9 @@ export class GalleryController {
     this.downloadAllBtn.innerHTML = originalContent;
     this.downloadAllBtn.classList.remove('loading');
     this.downloadAllBtn.disabled = false;
+    
+    if (failedUrls.length > 0) {
+      alert(`Note: ${failedUrls.length} items couldn't be retrieved automatically due to browser security restrictions.`);
+    }
   }
 }
