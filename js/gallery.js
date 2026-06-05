@@ -479,9 +479,8 @@ export class GalleryController {
       return;
     }
     
-    // Pre-load all images — only successfully loaded ones become slides
+    // Preserve true random array order by creating DOM elements synchronously
     sliderWrapper.innerHTML = '';
-    const loadedSlides = [];
     let sliderStarted = false;
     
     const dismissLoader = () => {
@@ -493,11 +492,15 @@ export class GalleryController {
     
     const startSlider = () => {
       if (sliderStarted) return;
-      if (loadedSlides.length === 0) return;
       sliderStarted = true;
       
-      // Mark the first loaded slide as active
-      loadedSlides[0].classList.add('active');
+      const firstSlide = sliderWrapper.querySelector('.slide');
+      if (firstSlide) {
+        firstSlide.classList.add('active');
+      } else {
+        // Nothing loaded at all — hide section
+        sliderSection.style.display = 'none';
+      }
       
       dismissLoader();
       
@@ -506,39 +509,28 @@ export class GalleryController {
       this.heroSlider.start();
     };
     
-    // Safety timeout — force-start with whatever we have after 5 seconds
+    // Safety timeout — force-start after 5 seconds regardless of loading state
     const safetyTimer = setTimeout(() => {
       if (!sliderStarted) {
-        if (loadedSlides.length > 0) {
-          startSlider();
-        } else {
-          // Nothing loaded at all — hide section
-          sliderSection.style.display = 'none';
-          dismissLoader();
-        }
+        startSlider();
       }
     }, 5000);
     
-    slidesList.forEach((media) => {
+    slidesList.forEach((media, index) => {
       const slideUrl = getHighResUrl(media.url, 1200);
-      const img = new Image();
-      img.src = slideUrl;
       
-      img.onload = () => {
-        const slide = document.createElement('div');
-        slide.className = 'slide';
-        slide.style.backgroundImage = `url('${slideUrl}')`;
-        sliderWrapper.appendChild(slide);
-        loadedSlides.push(slide);
-        
-        // Start as soon as the first image is ready
-        startSlider();
-      };
+      const slide = document.createElement('div');
+      slide.className = 'slide';
+      slide.style.backgroundImage = `url('${slideUrl}')`;
+      sliderWrapper.appendChild(slide);
       
-      // On error — simply skip this image, don't add a blank slide
-      img.onerror = () => {
-        console.warn("Hero slide image failed to load, skipping:", slideUrl);
-      };
+      // We only wait for the absolute FIRST slide in the array to load before dismissing the loader
+      if (index === 0) {
+        const img = new Image();
+        img.src = slideUrl;
+        img.onload = startSlider;
+        img.onerror = startSlider; // If it fails, start anyway so it rotates to the next one
+      }
     });
   }
 
