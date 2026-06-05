@@ -4,15 +4,11 @@
  */
 
 import { loadAlbums, getAlbumById } from './data.js';
-import { HeroSlider, GalleryController } from './gallery.js';
+import { GalleryController } from './gallery.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Initialize UI components
   const gallery = new GalleryController();
-  
-  // Initialize and start the hero slider
-  const slider = new HeroSlider('.hero-slider', 4000);
-  slider.start();
   
   // 2. Fetch all albums data from JSON
   const albums = await loadAlbums();
@@ -22,6 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Navigate via hash router
     window.location.hash = `album/${albumId}`;
   });
+
+  // Load Hero Slider dynamically
+  gallery.initHeroSlider(albums);
   
   // 3. Simple Client-Side Hash Router
   async function handleRouting() {
@@ -32,7 +31,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const album = await getAlbumById(albumId);
       
       if (album) {
-        slider.stop(); // Stop hero rotation when viewing a detailed gallery
         gallery.openAlbum(album);
       } else {
         // Fallback to home if album doesn't exist
@@ -41,7 +39,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       // Home state
       gallery.showHomeView();
-      slider.start(); // Resume slideshow on return to home
     }
   }
   

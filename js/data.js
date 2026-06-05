@@ -3,6 +3,9 @@
  * Handles fetching, parsing, and query helpers for the albums database.
  */
 
+// Google Apps Script Web App Deployment URL
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzue4gbVwspqTWelN7qiwclr3RwpMtj85FhKYLEFvAbo0K5wxZlJqsOo_1E3t86Fky1/exec';
+
 let cachedAlbums = null;
 
 /**
@@ -38,22 +41,31 @@ export async function getAlbumById(albumId) {
 }
 
 /**
- * Returns all media items for a given album ID.
- * Supports future integrations by abstraction.
- * @param {string} albumId - ID of the album
+ * Returns all media items for a given album.
+ * Fetches dynamically from Google Drive if folder ID source is set.
+ * @param {object} album - Album object
  * @returns {Promise<Array>} List of media items
  */
-export async function getMediaForAlbum(albumId) {
-  const album = await getAlbumById(albumId);
+export async function getMediaForAlbum(album) {
   if (!album) return [];
   
-  // Design architecture supports Google Drive/Cloudinary/YouTube later.
-  // In the future, if source points to drive_folder_id or a Cloudinary API,
-  // we would trigger an external API call here:
-  //
-  // if (album.source.startsWith('drive_folder_')) {
-  //    return await fetchFromGoogleDriveAPI(album.source);
-  // }
+  // If source is a Google Drive folder ID (i.e. not empty and not local)
+  if (album.source && album.source !== "local" && !album.source.startsWith("http")) {
+    try {
+      const response = await fetch(`${APPS_SCRIPT_URL}?folderId=${album.source}`);
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+      const mediaList = await response.json();
+      if (mediaList.error) {
+        throw new Error(mediaList.error);
+      }
+      return mediaList;
+    } catch (error) {
+      console.error("Google Drive Fetch Error:", error);
+      throw error; // Propagate for UI handling
+    }
+  }
   
   return album.media || [];
 }

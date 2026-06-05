@@ -1,6 +1,6 @@
 # UnarVault 🌐
 
-UnarVault is a personal family memories vault designed for storing and viewing photos, videos, and trips. It serves as a secure, private media archive for family relatives to preserve and share cherished moments.
+UnarVault is a personal memories vault designed for storing and viewing photos, videos, and trips. It serves as a secure, private media archive to preserve and share cherished moments, adventures, and shared journeys.
 
 Focusing on simplicity, performance, and a modern, high-quality user experience, the website runs entirely client-side without complex backend server dependencies.
 

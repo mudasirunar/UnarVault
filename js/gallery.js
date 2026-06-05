@@ -1,9 +1,29 @@
 /**
  * UnarVault Gallery & UI Controller
- * Manages the top slide-show, grid layouts, transitions, and the lightbox viewer.
+ * Manages the grid layouts, transitions, loaders, error handlers, and the lightbox viewer.
  */
 
 import { getMediaForAlbum } from './data.js';
+
+/**
+ * Helper to dynamically resize/scale Google Drive images for optimal resolution.
+ * Maps raw lh3 or uc links to the high-performance drive.google.com/thumbnail API.
+ */
+function getHighResUrl(url, size = 600) {
+  if (url) {
+    let fileId = '';
+    if (url.includes('lh3.googleusercontent.com/d/')) {
+      fileId = url.split('lh3.googleusercontent.com/d/')[1].split(/[?&]/)[0];
+    } else if (url.includes('id=')) {
+      fileId = url.split('id=')[1].split('&')[0];
+    }
+    
+    if (fileId) {
+      return `https://lh3.googleusercontent.com/d/${fileId}=w${size}`;
+    }
+  }
+  return url;
+}
 
 // SVG Icons
 const PLAY_ICON = `
@@ -31,13 +51,27 @@ const VIDEO_ICON = `
    1. HERO SLIDER CONTROLLER
    ========================================== */
 export class HeroSlider {
-  constructor(sliderSelector, intervalMs = 4000) {
+  constructor(sliderSelector, intervalMs = 5000) {
     this.slider = document.querySelector(sliderSelector);
     if (!this.slider) return;
     this.slides = this.slider.querySelectorAll('.slide');
     this.intervalMs = intervalMs;
     this.currentIndex = 0;
     this.timer = null;
+    
+    this.prevBtn = this.slider.querySelector('.hero-prev-btn');
+    this.nextBtn = this.slider.querySelector('.hero-next-btn');
+    
+    this.initEvents();
+  }
+
+  initEvents() {
+    if (this.prevBtn) {
+      this.prevBtn.addEventListener('click', () => this.prevSlideManual());
+    }
+    if (this.nextBtn) {
+      this.nextBtn.addEventListener('click', () => this.nextSlideManual());
+    }
   }
 
   start() {
@@ -54,9 +88,27 @@ export class HeroSlider {
   }
 
   nextSlide() {
+    if (this.slides.length <= 1) return;
     this.slides[this.currentIndex].classList.remove('active');
     this.currentIndex = (this.currentIndex + 1) % this.slides.length;
     this.slides[this.currentIndex].classList.add('active');
+  }
+
+  prevSlide() {
+    if (this.slides.length <= 1) return;
+    this.slides[this.currentIndex].classList.remove('active');
+    this.currentIndex = (this.currentIndex - 1 + this.slides.length) % this.slides.length;
+    this.slides[this.currentIndex].classList.add('active');
+  }
+
+  nextSlideManual() {
+    this.nextSlide();
+    this.start(); // reset auto interval on user click
+  }
+
+  prevSlideManual() {
+    this.prevSlide();
+    this.start(); // reset auto interval on user click
   }
 }
 
@@ -74,8 +126,17 @@ export class GalleryController {
     // Gallery Title Elements
     this.galleryTitle = document.querySelector('.gallery-title');
     this.galleryDesc = document.querySelector('.gallery-desc');
-    this.gallerySource = document.querySelector('.gallery-source-badge');
     this.backBtn = document.querySelector('.back-btn');
+    
+    // Gallery Filters
+    this.galleryFiltersContainer = document.getElementById('gallery-filters-container');
+    this.filterChips = {
+      all: this.galleryFiltersContainer ? this.galleryFiltersContainer.querySelector('[data-filter="all"]') : null,
+      images: this.galleryFiltersContainer ? this.galleryFiltersContainer.querySelector('[data-filter="images"]') : null,
+      videos: this.galleryFiltersContainer ? this.galleryFiltersContainer.querySelector('[data-filter="videos"]') : null
+    };
+    this.activeFilter = 'all';
+    this.filteredMediaList = [];
     
     // Modal Lightbox Elements
     this.modal = document.getElementById('modal-viewer');
@@ -84,11 +145,35 @@ export class GalleryController {
     this.closeBtn = document.querySelector('.close-btn');
     this.prevBtn = document.querySelector('.prev-btn');
     this.nextBtn = document.querySelector('.next-btn');
+    this.downloadBtn = this.modal.querySelector('.download-btn');
+    this.lightboxLoader = document.getElementById('lightbox-loader');
+    
+    // Custom Video Control Elements
+    this.videoControls = document.getElementById('custom-video-controls');
+    this.playPauseBtn = this.videoControls.querySelector('.play-pause-btn');
+    this.playIcon = this.playPauseBtn.querySelector('.play-icon');
+    this.pauseIcon = this.playPauseBtn.querySelector('.pause-icon');
+    this.replayIcon = this.playPauseBtn.querySelector('.replay-icon');
+    this.skipBackBtn = this.videoControls.querySelector('.skip-back-btn');
+    this.skipFwdBtn = this.videoControls.querySelector('.skip-fwd-btn');
+    this.progressBar = this.videoControls.querySelector('.progress-bar-container');
+    this.progressFill = this.videoControls.querySelector('.progress-bar-fill');
+    
+    this.volumeBtn = this.videoControls.querySelector('.volume-btn');
+    this.volumeUpIcon = this.volumeBtn.querySelector('.volume-up-icon');
+    this.volumeMuteIcon = this.volumeBtn.querySelector('.volume-mute-icon');
+    this.volumeSlider = this.videoControls.querySelector('.volume-slider');
+    this.fullscreenBtn = this.videoControls.querySelector('.fullscreen-btn');
     
     // Active State variables
     this.activeAlbumId = null;
     this.activeMediaList = [];
     this.currentMediaIndex = 0;
+    this.activeVideoElement = null;
+    this.isVideoMuted = false;
+    this.preMuteVolume = 1;
+    this.currentVolume = 1; // session volume persistence
+    this.heroSlider = null;
     
     this.initEvents();
   }
@@ -97,6 +182,17 @@ export class GalleryController {
     // Back to Home
     if (this.backBtn) {
       this.backBtn.addEventListener('click', () => this.showHomeView());
+    }
+    
+    // Filter chip triggers
+    if (this.galleryFiltersContainer) {
+      const chips = this.galleryFiltersContainer.querySelectorAll('.filter-chip');
+      chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          const filterType = chip.dataset.filter;
+          this.applyFilter(filterType);
+        });
+      });
     }
     
     // Modal Navigation and Close triggers
@@ -110,6 +206,40 @@ export class GalleryController {
     
     if (this.nextBtn) {
       this.nextBtn.addEventListener('click', () => this.navigateLightbox(1));
+    }
+    
+    // Download current item click listener
+    if (this.downloadBtn) {
+      this.downloadBtn.addEventListener('click', () => this.downloadActiveMedia());
+    }
+
+    // Custom Video Players Click Listeners
+    if (this.playPauseBtn) {
+      this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
+    }
+
+    if (this.skipBackBtn) {
+      this.skipBackBtn.addEventListener('click', () => this.skipVideo(-5));
+    }
+
+    if (this.skipFwdBtn) {
+      this.skipFwdBtn.addEventListener('click', () => this.skipVideo(5));
+    }
+
+    if (this.progressBar) {
+      this.progressBar.addEventListener('click', (e) => this.seekVideo(e));
+    }
+
+    if (this.volumeSlider) {
+      this.volumeSlider.addEventListener('input', (e) => this.changeVolume(parseFloat(e.target.value)));
+    }
+
+    if (this.volumeBtn) {
+      this.volumeBtn.addEventListener('click', () => this.toggleMute());
+    }
+
+    if (this.fullscreenBtn) {
+      this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
     }
     
     // Close modal on background click
@@ -128,15 +258,29 @@ export class GalleryController {
       if (e.key === 'Escape') {
         this.closeLightbox();
       } else if (e.key === 'ArrowLeft') {
-        this.navigateLightbox(-1);
+        if (this.activeVideoElement) {
+          e.preventDefault();
+          this.skipVideo(-5);
+        } else {
+          this.navigateLightbox(-1);
+        }
       } else if (e.key === 'ArrowRight') {
-        this.navigateLightbox(1);
+        if (this.activeVideoElement) {
+          e.preventDefault();
+          this.skipVideo(5);
+        } else {
+          this.navigateLightbox(1);
+        }
+      } else if (e.key === ' ' && this.activeVideoElement) {
+        e.preventDefault();
+        this.togglePlayPause();
       }
     });
   }
 
   /**
    * Renders the grid of album cards on the Home View.
+   * Resolves thumbnails dynamically from Drive folders if album.thumbnail is empty.
    * @param {Array} albums 
    * @param {Function} onAlbumSelect 
    */
@@ -145,30 +289,27 @@ export class GalleryController {
     this.albumsGrid.innerHTML = '';
     
     albums.forEach(album => {
-      const card = document.createElement('div');
+      const card = document.createElement('a');
       card.className = 'album-card';
+      card.href = `#album/${album.id}`;
       card.dataset.id = album.id;
-      
-      const icon = album.type === 'videos' ? VIDEO_ICON : PHOTO_ICON;
       
       card.innerHTML = `
         <div class="album-thumbnail-wrapper">
+          <div class="spinner-mini"></div>
           <img 
-            src="${album.thumbnail}" 
+            src="" 
             alt="${album.name}" 
             class="album-thumbnail" 
+            style="opacity: 0; transition: opacity 0.4s ease;"
             loading="lazy"
           />
-          <div class="album-type-badge">
-            ${icon}
-            <span>${album.type}</span>
-          </div>
         </div>
         <div class="album-info">
           <h3 class="album-name">${album.name}</h3>
           <p class="album-desc">${album.description}</p>
           <div class="album-meta">
-            <span>View Album</span>
+            <span class="album-action">View Album</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>
@@ -177,14 +318,151 @@ export class GalleryController {
         </div>
       `;
       
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
+        e.preventDefault();
         if (onAlbumSelect) {
           onAlbumSelect(album.id);
         }
       });
       
       this.albumsGrid.appendChild(card);
+
+      // Async fetch media to resolve thumbnail if empty
+      const img = card.querySelector('.album-thumbnail');
+      const spinner = card.querySelector('.spinner-mini');
+      
+      (async () => {
+        let media = [];
+        try {
+          media = await getMediaForAlbum(album);
+        } catch (e) {
+          console.error("Failed to dynamically fetch album media:", e);
+        }
+        
+        let thumbnail = album.thumbnail;
+        if (!thumbnail && media.length > 0) {
+          thumbnail = media[0].thumbnail || media[0].url;
+        }
+        
+        // Optimize resolution for grid card preview
+        thumbnail = getHighResUrl(thumbnail, 600);
+        
+        // Final fallback if loading or api fails
+        if (!thumbnail) {
+          thumbnail = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=600&auto=format&fit=crop";
+        }
+        
+        img.src = thumbnail;
+        img.onload = () => {
+          img.style.opacity = '1';
+          if (spinner) spinner.remove();
+        };
+        img.onerror = () => {
+          img.src = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=600&auto=format&fit=crop";
+          img.style.opacity = '1';
+          if (spinner) spinner.remove();
+        };
+      })();
     });
+  }
+
+  /**
+   * Initializes the dynamic Hero Slider by fetching all images from all albums,
+   * selecting a random 20% from each, interleaving them, and starting the loop.
+   * @param {Array} albums 
+   */
+  async initHeroSlider(albums) {
+    const sliderSection = document.getElementById('hero-slider-section');
+    const sliderWrapper = document.getElementById('hero-slider-wrapper');
+    const sliderLoader = document.getElementById('hero-slider-loader');
+    if (!sliderSection || !sliderWrapper) return;
+    
+    // Reset loader state and show slider section
+    if (sliderLoader) {
+      sliderLoader.style.display = 'flex';
+      sliderLoader.style.opacity = '1';
+    }
+    sliderSection.style.display = 'block';
+    
+    // Stop any existing slider
+    if (this.heroSlider) {
+      this.heroSlider.stop();
+      this.heroSlider = null;
+    }
+    
+    // Fetch media lists for all albums in parallel
+    const allMediaPromises = albums.map(async (album) => {
+      try {
+        const mediaList = await getMediaForAlbum(album);
+        // Only pick images for the hero slider
+        return mediaList.filter(item => item.type === 'image');
+      } catch (e) {
+        console.error("Failed to load album images for slider:", album.name, e);
+        return [];
+      }
+    });
+    
+    const albumsImages = await Promise.all(allMediaPromises);
+    
+    // Pick a random 20% subset of images from each folder (minimum 1 if folder has images)
+    const selectedImagesPerAlbum = albumsImages.map(images => {
+      if (images.length === 0) return [];
+      const countToPick = Math.max(1, Math.round(images.length * 0.2));
+      const shuffled = [...images].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, countToPick);
+    });
+    
+    // Interleave the selected images (one first from first folder, then second folder, etc.)
+    const slidesList = [];
+    const maxLen = Math.max(...selectedImagesPerAlbum.map(arr => arr.length), 0);
+    
+    for (let i = 0; i < maxLen; i++) {
+      for (let j = 0; j < selectedImagesPerAlbum.length; j++) {
+        if (i < selectedImagesPerAlbum[j].length) {
+          slidesList.push(selectedImagesPerAlbum[j][i]);
+        }
+      }
+    }
+    
+    // If no images resolved across all folders, hide slider and show nothing (no error)
+    if (slidesList.length === 0) {
+      sliderSection.style.display = 'none';
+      return;
+    }
+    
+    // Render dynamic slides
+    sliderWrapper.innerHTML = '';
+    slidesList.forEach((media, idx) => {
+      const slide = document.createElement('div');
+      slide.className = `slide ${idx === 0 ? 'active' : ''}`;
+      // Use public CDN url for slides background
+      const slideUrl = getHighResUrl(media.url, 1600);
+      slide.style.backgroundImage = `url('${slideUrl}')`;
+      sliderWrapper.appendChild(slide);
+    });
+    
+    // Preload first slide image for smooth loader fadeout
+    if (slidesList.length > 0) {
+      const firstImgUrl = getHighResUrl(slidesList[0].url, 1600);
+      const img = new Image();
+      img.src = firstImgUrl;
+      const hideLoader = () => {
+        if (sliderLoader) {
+          sliderLoader.style.opacity = '0';
+          setTimeout(() => {
+            sliderLoader.style.display = 'none';
+          }, 500);
+        }
+      };
+      img.onload = hideLoader;
+      img.onerror = hideLoader;
+    } else {
+      if (sliderLoader) sliderLoader.style.display = 'none';
+    }
+    
+    // Initialize slider control class
+    this.heroSlider = new HeroSlider('#hero-slider-section', 5000);
+    this.heroSlider.start();
   }
 
   /**
@@ -193,32 +471,155 @@ export class GalleryController {
    */
   async openAlbum(album) {
     this.activeAlbumId = album.id;
-    this.activeMediaList = await getMediaForAlbum(album.id);
     
+    // Reset active filter
+    this.activeFilter = 'all';
+    if (this.galleryFiltersContainer) {
+      const chips = this.galleryFiltersContainer.querySelectorAll('.filter-chip');
+      chips.forEach(chip => {
+        if (chip.dataset.filter === 'all') {
+          chip.classList.add('active');
+        } else {
+          chip.classList.remove('active');
+        }
+      });
+    }
+    
+    // Disable filters initially while loading
+    this.setFiltersDisabled(true);
+    
+    // Pause hero slider if running to save resources
+    if (this.heroSlider) {
+      this.heroSlider.stop();
+    }
+    
+    // Toggle active view CSS (show layout first so loader fits)
+    this.homeView.classList.remove('active');
+    this.galleryView.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Show Loader, Hide Media Grid & Error Banner
+    const loader = document.getElementById('gallery-loader');
+    const errorBanner = document.getElementById('gallery-error');
+    if (loader) loader.style.display = 'flex';
+    if (errorBanner) errorBanner.style.display = 'none';
+    if (this.mediaGrid) this.mediaGrid.style.display = 'none';
+
     // Set Header/Metadata titles
     this.galleryTitle.textContent = album.name;
     this.galleryDesc.textContent = album.description;
-    this.gallerySource.textContent = `Source: ${album.source}`;
-    
-    // Render media items
-    this.renderMedia();
-    
-    // Toggle active view CSS
-    this.homeView.classList.remove('active');
-    this.galleryView.classList.add('active');
-    
-    // Scroll window smoothly to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    try {
+      this.activeMediaList = await getMediaForAlbum(album);
+      
+      // Calculate counts and update badges
+      const totalCount = this.activeMediaList.length;
+      const imageCount = this.activeMediaList.filter(item => item.type === 'image').length;
+      const videoCount = this.activeMediaList.filter(item => item.type === 'video').length;
+      
+      if (this.filterChips.all) {
+        const countSpan = this.filterChips.all.querySelector('.filter-count');
+        if (countSpan) countSpan.textContent = `(${totalCount})`;
+      }
+      if (this.filterChips.images) {
+        const countSpan = this.filterChips.images.querySelector('.filter-count');
+        if (countSpan) countSpan.textContent = `(${imageCount})`;
+      }
+      if (this.filterChips.videos) {
+        const countSpan = this.filterChips.videos.querySelector('.filter-count');
+        if (countSpan) countSpan.textContent = `(${videoCount})`;
+      }
+      
+      this.filteredMediaList = [...this.activeMediaList];
+      
+      // Re-enable filters since media has loaded
+      this.setFiltersDisabled(false);
+      
+      // Render media items
+      this.renderMedia();
+      
+      // Hide loader, show grid
+      if (loader) loader.style.display = 'none';
+      if (this.mediaGrid) this.mediaGrid.style.display = 'block';
+    } catch (error) {
+      console.error("Failed to load gallery files:", error);
+      
+      // Keep filters disabled if load failed
+      this.setFiltersDisabled(true);
+      
+      // Hide loader, show error banner
+      if (loader) loader.style.display = 'none';
+      if (errorBanner) {
+        errorBanner.style.display = 'flex';
+        const errorText = document.getElementById('error-message-text');
+        if (errorText) {
+          errorText.textContent = `Error details: ${error.message || 'Check Google Drive shared permissions.'}`;
+        }
+      }
+    }
   }
 
   showHomeView() {
     this.activeAlbumId = null;
     this.activeMediaList = [];
+    this.filteredMediaList = [];
+    
+    // Resume hero slider if configured
+    if (this.heroSlider) {
+      this.heroSlider.start();
+    }
     
     this.galleryView.classList.remove('active');
     this.homeView.classList.add('active');
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  applyFilter(filterType) {
+    // Ignore clicks if filters are currently disabled
+    if (this.galleryFiltersContainer && this.galleryFiltersContainer.querySelector('.filter-chip.disabled')) {
+      return;
+    }
+
+    this.activeFilter = filterType;
+    
+    // Update UI chips active state
+    if (this.galleryFiltersContainer) {
+      const chips = this.galleryFiltersContainer.querySelectorAll('.filter-chip');
+      chips.forEach(chip => {
+        if (chip.dataset.filter === filterType) {
+          chip.classList.add('active');
+        } else {
+          chip.classList.remove('active');
+        }
+      });
+    }
+    
+    // Filter activeMediaList into filteredMediaList
+    if (filterType === 'all') {
+      this.filteredMediaList = [...this.activeMediaList];
+    } else if (filterType === 'images') {
+      this.filteredMediaList = this.activeMediaList.filter(item => item.type === 'image');
+    } else if (filterType === 'videos') {
+      this.filteredMediaList = this.activeMediaList.filter(item => item.type === 'video');
+    }
+    
+    this.renderMedia();
+  }
+
+  setFiltersDisabled(disabled) {
+    if (this.galleryFiltersContainer) {
+      const chips = this.galleryFiltersContainer.querySelectorAll('.filter-chip');
+      chips.forEach(chip => {
+        if (disabled) {
+          chip.setAttribute('disabled', 'true');
+          chip.classList.add('disabled');
+        } else {
+          chip.removeAttribute('disabled');
+          chip.classList.remove('disabled');
+        }
+      });
+    }
   }
 
   /**
@@ -228,37 +629,39 @@ export class GalleryController {
     if (!this.mediaGrid) return;
     this.mediaGrid.innerHTML = '';
     
-    if (this.activeMediaList.length === 0) {
+    if (this.filteredMediaList.length === 0) {
       this.mediaGrid.innerHTML = `
-        <div class="empty-gallery-msg">
-          <p>No media files found in this album.</p>
+        <div class="empty-gallery-msg" style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
+          <p>No media files found in this category.</p>
         </div>
       `;
       return;
     }
     
-    this.activeMediaList.forEach((media, index) => {
+    this.filteredMediaList.forEach((media, index) => {
       const item = document.createElement('div');
       item.className = 'media-item';
       item.dataset.index = index;
       
       const isVideo = media.type === 'video';
       
-      // We render a standard thumbnail. For video, we show a play button overlay.
       let thumbnailElement = '';
       if (isVideo) {
-        // Find or generate a video placeholder. For our mock videos, we can use a beautiful Unsplash cover or let it render if possible.
-        // To make it look stunning, we fetch a default video thumbnail or use a nice custom image.
-        const mockThumbnail = media.thumbnail || "https://images.unsplash.com/photo-1518173946687-a4c8a383392e?q=80&w=600&auto=format&fit=crop";
+        // Optimize video cover preview image size to w600
+        const mockThumbnail = getHighResUrl(media.thumbnail || "https://images.unsplash.com/photo-1518173946687-a4c8a383392e?q=80&w=600&auto=format&fit=crop", 600);
         thumbnailElement = `
-          <img src="${mockThumbnail}" alt="${media.caption}" class="media-element" loading="lazy" />
+          <div class="spinner-mini"></div>
+          <img src="${mockThumbnail}" alt="${media.caption}" class="media-element is-loading" style="opacity: 0; transition: opacity 0.4s ease, filter 0.4s ease;" loading="lazy" />
           <div class="video-indicator">
             ${PLAY_ICON}
           </div>
         `;
       } else {
+        // Optimize grid image size to w600
+        const gridImgUrl = getHighResUrl(media.url, 600);
         thumbnailElement = `
-          <img src="${media.url}" alt="${media.caption}" class="media-element" loading="lazy" />
+          <div class="spinner-mini"></div>
+          <img src="${gridImgUrl}" alt="${media.caption}" class="media-element is-loading" style="opacity: 0; transition: opacity 0.4s ease, filter 0.4s ease;" loading="lazy" />
         `;
       }
       
@@ -268,6 +671,22 @@ export class GalleryController {
           <div class="media-caption">${media.caption}</div>
         </div>
       `;
+      
+      const img = item.querySelector('.media-element');
+      const spinner = item.querySelector('.spinner-mini');
+      if (img) {
+        img.onload = () => {
+          img.classList.remove('is-loading');
+          img.style.opacity = '1';
+          if (spinner) spinner.remove();
+        };
+        img.onerror = () => {
+          img.classList.remove('is-loading');
+          img.src = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=600&auto=format&fit=crop";
+          img.style.opacity = '1';
+          if (spinner) spinner.remove();
+        };
+      }
       
       item.addEventListener('click', () => this.openLightbox(index));
       this.mediaGrid.appendChild(item);
@@ -285,14 +704,18 @@ export class GalleryController {
   }
 
   closeLightbox() {
-    // Clear video resource if playing to stop sound
+    if (this.activeVideoElement) {
+      this.activeVideoElement.pause();
+      this.activeVideoElement = null;
+    }
     this.modalMediaContainer.innerHTML = '';
     this.modal.classList.remove('active');
     document.body.style.overflow = ''; // Restore background scrolling
+    if (this.videoControls) this.videoControls.style.display = 'none';
   }
 
   navigateLightbox(direction) {
-    const total = this.activeMediaList.length;
+    const total = this.filteredMediaList.length;
     if (total === 0) return;
     
     // Cycle indices
@@ -303,25 +726,242 @@ export class GalleryController {
   updateLightboxContent() {
     this.modalMediaContainer.innerHTML = ''; // Reset container
     
-    const media = this.activeMediaList[this.currentMediaIndex];
+    // Hide controls initially
+    if (this.videoControls) this.videoControls.style.display = 'none';
+    this.activeVideoElement = null;
+
+    const media = this.filteredMediaList[this.currentMediaIndex];
     if (!media) return;
     
+    // Show Lightbox Loader
+    if (this.lightboxLoader) this.lightboxLoader.style.display = 'flex';
+
     let element;
     
     if (media.type === 'video') {
-      element = document.createElement('video');
-      element.src = media.url;
-      element.controls = true;
-      element.autoplay = true;
+      element = document.createElement('iframe');
+      let videoUrl = media.url;
+      let fileId = '';
+      if (videoUrl.includes('lh3.googleusercontent.com/d/')) {
+        fileId = videoUrl.split('lh3.googleusercontent.com/d/')[1].split(/[?&]/)[0];
+      } else if (videoUrl.includes('id=')) {
+        fileId = videoUrl.split('id=')[1].split('&')[0];
+      }
+      
+      if (fileId) {
+        element.src = `https://drive.google.com/file/d/${fileId}/preview?autoplay=1`;
+      } else {
+        element.src = videoUrl.includes('?') ? `${videoUrl}&autoplay=1` : `${videoUrl}?autoplay=1`;
+      }
+      
       element.className = 'modal-media';
+      element.setAttribute('frameborder', '0');
+      element.setAttribute('allow', 'autoplay; fullscreen');
+      element.setAttribute('allowfullscreen', 'true');
+      
+      // Google Drive iframe has its own player controls — hide our custom overlay
+      if (this.videoControls) this.videoControls.style.display = 'none';
+      
+      element.onload = () => {
+        if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
+      };
+      
+      this.modalMediaContainer.appendChild(element);
+      
     } else {
       element = document.createElement('img');
-      element.src = media.url;
-      element.alt = media.caption;
-      element.className = 'modal-media';
+      element.alt = media.caption || '';
+      element.className = 'modal-media is-loading';
+      
+      element.onload = () => {
+        element.classList.remove('is-loading');
+        if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
+      };
+      element.onerror = () => {
+        if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
+        
+        // Render detailed warning panel and Reload Button
+        this.modalMediaContainer.innerHTML = `
+          <div class="lightbox-error-container">
+            <svg class="error-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <div class="lightbox-error-text">Failed to load this image. Check your internet connection or shared settings.</div>
+            <button class="lightbox-reload-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              Reload Image
+            </button>
+          </div>
+        `;
+        
+        const reloadBtn = this.modalMediaContainer.querySelector('.lightbox-reload-btn');
+        if (reloadBtn) {
+          reloadBtn.addEventListener('click', () => {
+            // Append cache buster parameter to bypass local network cache and force reload
+            media.url = media.url.split('?')[0] + '?t=' + Date.now();
+            this.updateLightboxContent();
+          });
+        }
+      };
+      
+      this.modalMediaContainer.appendChild(element);
+      
+      // Request high-resolution version (w1600) for sharp full-screen modal preview
+      // Setting src after registering events and appending to DOM prevents sync race issues
+      const highResUrl = getHighResUrl(media.url, 1600);
+      element.src = highResUrl;
+    }
+    this.modalCaption.textContent = media.caption || '';
+  }
+
+  /* ==========================================
+     CUSTOM VIDEO PLAYER CONTROL METHODS
+     ========================================== */
+  togglePlayPause() {
+    if (!this.activeVideoElement) return;
+    if (this.activeVideoElement.paused || this.activeVideoElement.ended) {
+      if (this.activeVideoElement.ended) {
+        this.activeVideoElement.currentTime = 0;
+      }
+      this.activeVideoElement.play();
+    } else {
+      this.activeVideoElement.pause();
+    }
+  }
+
+  updatePlayPauseUI(state) {
+    if (!this.playIcon || !this.pauseIcon || !this.replayIcon) return;
+    
+    if (state === 'play') {
+      this.playIcon.style.display = 'none';
+      this.pauseIcon.style.display = 'block';
+      this.replayIcon.style.display = 'none';
+    } else if (state === 'pause') {
+      this.playIcon.style.display = 'block';
+      this.pauseIcon.style.display = 'none';
+      this.replayIcon.style.display = 'none';
+    } else if (state === 'ended') {
+      this.playIcon.style.display = 'none';
+      this.pauseIcon.style.display = 'none';
+      this.replayIcon.style.display = 'block';
+    }
+  }
+
+  skipVideo(seconds) {
+    if (!this.activeVideoElement) return;
+    this.activeVideoElement.currentTime = Math.max(0, Math.min(this.activeVideoElement.duration || 0, this.activeVideoElement.currentTime + seconds));
+    this.updateProgressBar();
+  }
+
+  seekVideo(e) {
+    if (!this.activeVideoElement) return;
+    const rect = this.progressBar.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    this.activeVideoElement.currentTime = percentage * (this.activeVideoElement.duration || 0);
+    this.updateProgressBar();
+  }
+
+  changeVolume(value) {
+    this.currentVolume = value;
+    if (this.volumeSlider) {
+      this.volumeSlider.value = value;
     }
     
-    this.modalMediaContainer.appendChild(element);
-    this.modalCaption.textContent = media.caption || '';
+    if (value === 0) {
+      if (this.volumeUpIcon) this.volumeUpIcon.style.display = 'none';
+      if (this.volumeMuteIcon) this.volumeMuteIcon.style.display = 'block';
+      this.isVideoMuted = true;
+    } else {
+      if (this.volumeUpIcon) this.volumeUpIcon.style.display = 'block';
+      if (this.volumeMuteIcon) this.volumeMuteIcon.style.display = 'none';
+      this.isVideoMuted = false;
+      this.preMuteVolume = value;
+    }
+    
+    if (this.activeVideoElement) {
+      this.activeVideoElement.volume = value;
+    }
+  }
+
+  toggleMute() {
+    if (this.isVideoMuted) {
+      this.changeVolume(this.preMuteVolume || 1);
+    } else {
+      if (this.activeVideoElement) {
+        this.preMuteVolume = this.activeVideoElement.volume;
+      } else {
+        this.preMuteVolume = this.currentVolume;
+      }
+      this.changeVolume(0);
+    }
+  }
+
+  toggleFullscreen() {
+    if (!this.activeVideoElement) return;
+    if (this.activeVideoElement.requestFullscreen) {
+      this.activeVideoElement.requestFullscreen();
+    } else if (this.activeVideoElement.webkitRequestFullscreen) {
+      this.activeVideoElement.webkitRequestFullscreen();
+    } else if (this.activeVideoElement.msRequestFullscreen) {
+      this.activeVideoElement.msRequestFullscreen();
+    }
+  }
+
+  updateProgressBar() {
+    if (!this.activeVideoElement) return;
+    const duration = this.activeVideoElement.duration || 0;
+    const currentTime = this.activeVideoElement.currentTime || 0;
+    if (duration > 0) {
+      const percentage = (currentTime / duration) * 100;
+      this.progressFill.style.width = `${percentage}%`;
+    }
+  }
+
+  /* ==========================================
+     DIRECT DOWNLOAD HELPER
+     ========================================== */
+  async downloadActiveMedia() {
+    const media = this.filteredMediaList[this.currentMediaIndex];
+    if (!media) return;
+    
+    const url = media.url;
+    const extension = media.type === 'video' ? 'mp4' : 'jpg';
+    const filename = `${media.caption.replace(/[\s\W]+/g, '_') || 'download'}.${extension}`;
+    
+    // Animate button scale
+    this.downloadBtn.style.transform = 'scale(0.85)';
+    setTimeout(() => { this.downloadBtn.style.transform = ''; }, 200);
+
+    try {
+      // Direct client-side fetch download
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("CORS limit or fetch issue");
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.warn("Direct fetch blocked (CORS). Falling back to Google Drive forced download trigger:", error);
+      
+      // Parse fileId from URL link
+      let downloadUrl = url;
+      if (url.includes('lh3.googleusercontent.com/d/')) {
+        const fileId = url.split('lh3.googleusercontent.com/d/')[1].split(/[?&]/)[0];
+        downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+      
+      window.open(downloadUrl, '_blank');
+    }
   }
 }
