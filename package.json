@@ -1,0 +1,14 @@
+{
+  "name": "unar-vault",
+  "version": "1.0.0",
+  "description": "Private family memories, trips, and moments gallery vault",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

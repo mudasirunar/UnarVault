@@ -3,14 +3,124 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UnarVault - Family Memories Vault</title>
+  <title>UnarVault</title>
+  <meta name="description" content="A premium, private memories vault for family photos, videos, events, and trips. Keeping moments safe and beautiful.">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <div id="app">
-    <h1>UnarVault</h1>
-    <p>Private Family memories, trips, and moments vault.</p>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="container header-container">
+      <a href="#home" class="logo">
+        <span>🌐</span> UnarVault
+      </a>
+      <nav class="nav-links">
+        <a href="#home" class="nav-link active">Home</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- HOME PAGE VIEW -->
+  <div id="home-view" class="page-view active">
+    <!-- Hero Top Slider -->
+    <section class="hero-section">
+      <div class="hero-slider">
+        <!-- Slide 1 -->
+        <div class="slide active" style="background-image: url('https://images.unsplash.com/photo-1543257580-7269da773bf5?q=80&w=1600&auto=format&fit=crop');"></div>
+        <!-- Slide 2 -->
+        <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1510312305653-8ed496efae75?q=80&w=1600&auto=format&fit=crop');"></div>
+        <!-- Slide 3 -->
+        <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1600&auto=format&fit=crop');"></div>
+      </div>
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <h1 class="hero-title">UnarVault</h1>
+        <p class="hero-subtitle">Family Memories • Trips • Events • Moments</p>
+      </div>
+    </section>
+
+    <!-- Albums Grid -->
+    <section class="albums-section">
+      <div class="container">
+        <h2 class="section-title">📁 Family Albums</h2>
+        <div class="albums-grid">
+          <!-- Album Cards will be generated dynamically by js/gallery.js -->
+        </div>
+      </div>
+    </section>
   </div>
+
+  <!-- GALLERY VIEW -->
+  <div id="gallery-view" class="page-view">
+    <section class="gallery-section">
+      <div class="container">
+        <div class="gallery-header">
+          <button class="back-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Back to Albums</span>
+          </button>
+          <div class="gallery-title-row">
+            <div class="gallery-title-info">
+              <h1 class="gallery-title">Album Name</h1>
+              <p class="gallery-desc">Album description goes here.</p>
+            </div>
+            <span class="gallery-source-badge">Source: drive_folder_id</span>
+          </div>
+        </div>
+
+        <!-- Masonry/Grid Media Items -->
+        <div class="media-grid">
+          <!-- Media elements (images/videos) will be rendered dynamically by js/gallery.js -->
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- FULLSCREEN LIGHTBOX MODAL VIEWER -->
+  <div id="modal-viewer" class="modal-viewer">
+    <div class="modal-content-wrapper">
+      <!-- Media placeholder (dynamically inserts img or video tags) -->
+      <div class="modal-media-container"></div>
+      
+      <!-- Bottom Text Caption -->
+      <p class="modal-caption"></p>
+      
+      <!-- Interactive Buttons -->
+      <button class="modal-btn close-btn" aria-label="Close lightbox">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      
+      <button class="modal-btn prev-btn" aria-label="Previous item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      
+      <button class="modal-btn next-btn" aria-label="Next item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- App Footer -->
+  <footer class="app-footer">
+    <div class="container footer-container">
+      <div class="footer-logo">🌐 UnarVault</div>
+      <p>A private family memory archive. Preserving history, one memory at a time.</p>
+      <p style="margin-top: 4px; font-size: 11px; opacity: 0.6;">&copy; 2026 UnarVault. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Main scripts -->
   <script src="js/app.js" type="module"></script>
 </body>
 </html>
