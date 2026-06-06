@@ -883,7 +883,6 @@ export class GalleryController {
     let element;
     
     if (media.type === 'video') {
-      const isMobile = window.innerWidth <= 768;
       let videoUrl = media.url;
       let fileId = '';
       if (videoUrl.includes('lh3.googleusercontent.com/d/')) {
@@ -910,16 +909,10 @@ export class GalleryController {
       // Prevent Android Chrome / Safari from extracting the video and overlaying native browser controls
       element.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
 
-      if (isMobile) {
-        // Hide lightbox loader immediately for mobile (iframe loader is sufficient)
+      element.onload = () => {
         if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
         this.modal.classList.remove('lightbox-loading');
-      } else {
-        element.onload = () => {
-          if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
-          this.modal.classList.remove('lightbox-loading');
-        };
-      }
+      };
       
       this.modalMediaContainer.appendChild(element);
       
