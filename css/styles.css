@@ -1036,40 +1036,10 @@ iframe.modal-media {
     gap: 0; /* No space between media and controls */
   }
 
-  /* Fullscreen override specifically for videos to maximize media viewport and separate Google Drive controls */
+  /* Cinema-black background for video/iframe modals on mobile */
   .modal-content-wrapper:has(iframe),
   .modal-content-wrapper:has(video) {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-    border: none !important;
-    padding: 72px 0 72px 0 !important; /* Zero padding on left/right to let video fill screen width */
-    background-color: #000000 !important; /* Pure black background for cinema video viewing */
-  }
-
-  /* Float navigation buttons on the left and right sides for videos to prevent overlapping the timing slider and playback controls */
-  .modal-content-wrapper:has(iframe) .prev-btn,
-  .modal-content-wrapper:has(video) .prev-btn {
-    position: absolute;
-    left: 16px !important;
-    right: auto !important;
-    top: 50%;
-    bottom: auto;
-    transform: translateY(-50%) !important;
-    z-index: 1010;
-  }
-
-  .modal-content-wrapper:has(iframe) .next-btn,
-  .modal-content-wrapper:has(video) .next-btn {
-    position: absolute;
-    right: 16px !important;
-    left: auto !important;
-    top: 50%;
-    bottom: auto;
-    transform: translateY(-50%) !important;
-    z-index: 1010;
+    background-color: #000000 !important;
   }
 
   .modal-media-container {

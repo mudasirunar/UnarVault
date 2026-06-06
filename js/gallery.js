@@ -892,77 +892,29 @@ export class GalleryController {
         fileId = videoUrl.split('id=')[1].split('&')[0];
       }
 
-      if (isMobile) {
-        // Use custom controls overlay for mobile native video player
-        element = document.createElement('video');
-        element.className = 'modal-media';
-        element.controls = false; // Hide native controls
-        element.autoplay = true;
-        element.playsInline = true;
-        
-        this.activeVideoElement = element;
-        // Sync volume setting
-        element.volume = this.currentVolume;
+      // Clear container and hide video controls
+      this.modalMediaContainer.innerHTML = '';
+      if (this.videoControls) this.videoControls.style.display = 'none';
+      this.activeVideoElement = null;
 
-        // Register custom control event listeners
-        element.addEventListener('timeupdate', () => this.updateProgressBar());
-        element.addEventListener('play', () => this.updatePlayPauseUI('play'));
-        element.addEventListener('pause', () => this.updatePlayPauseUI('pause'));
-        element.addEventListener('ended', () => this.updatePlayPauseUI('ended'));
-        
-        if (fileId) {
-          element.src = `https://drive.google.com/uc?export=download&id=${fileId}`;
-        } else {
-          element.src = videoUrl;
-        }
-
-        element.onloadedmetadata = () => {
-          if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
-          this.modal.classList.remove('lightbox-loading');
-        };
-        
-        // Show our custom controls on mobile
-        if (this.videoControls) this.videoControls.style.display = 'flex';
-
-        element.onerror = () => {
-          console.warn("Native video streaming failed. Falling back to Google Drive iframe player.");
-          this.modalMediaContainer.innerHTML = '';
-          const iframe = document.createElement('iframe');
-          if (fileId) {
-            iframe.src = `https://drive.google.com/file/d/${fileId}/preview?autoplay=1`;
-          } else {
-            iframe.src = videoUrl.includes('?') ? `${videoUrl}&autoplay=1` : `${videoUrl}?autoplay=1`;
-          }
-          iframe.className = 'modal-media';
-          iframe.setAttribute('frameborder', '0');
-          iframe.setAttribute('allow', 'autoplay; fullscreen');
-          iframe.setAttribute('allowfullscreen', 'true');
-          
-          this.activeVideoElement = null;
-          if (this.videoControls) this.videoControls.style.display = 'none';
-
-          iframe.onload = () => {
-            if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
-            this.modal.classList.remove('lightbox-loading');
-          };
-          this.modalMediaContainer.appendChild(iframe);
-        };
+      element = document.createElement('iframe');
+      if (fileId) {
+        element.src = `https://drive.google.com/file/d/${fileId}/preview?autoplay=1`;
       } else {
-        // Desktop uses Google Drive preview iframe player
-        element = document.createElement('iframe');
-        if (fileId) {
-          element.src = `https://drive.google.com/file/d/${fileId}/preview?autoplay=1`;
-        } else {
-          element.src = videoUrl.includes('?') ? `${videoUrl}&autoplay=1` : `${videoUrl}?autoplay=1`;
-        }
-        element.className = 'modal-media';
-        element.setAttribute('frameborder', '0');
-        element.setAttribute('allow', 'autoplay; fullscreen');
-        element.setAttribute('allowfullscreen', 'true');
-        
-        this.activeVideoElement = null;
-        if (this.videoControls) this.videoControls.style.display = 'none';
+        element.src = videoUrl.includes('?') ? `${videoUrl}&autoplay=1` : `${videoUrl}?autoplay=1`;
+      }
+      element.className = 'modal-media';
+      element.setAttribute('frameborder', '0');
+      element.setAttribute('allow', 'autoplay; fullscreen');
+      element.setAttribute('allowfullscreen', 'true');
+      // Prevent Android Chrome / Safari from extracting the video and overlaying native browser controls
+      element.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
 
+      if (isMobile) {
+        // Hide lightbox loader immediately for mobile (iframe loader is sufficient)
+        if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
+        this.modal.classList.remove('lightbox-loading');
+      } else {
         element.onload = () => {
           if (this.lightboxLoader) this.lightboxLoader.style.display = 'none';
           this.modal.classList.remove('lightbox-loading');
